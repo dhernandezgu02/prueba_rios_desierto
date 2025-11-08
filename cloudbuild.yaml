@@ -1,0 +1,187 @@
+# Cloud Build - CI/CD para Sistema Ríos del Desierto
+# Despliegue automatizado en Google Cloud Run
+
+steps:
+  # Paso 1: Instalar dependencias y ejecutar tests del backend
+  - name: 'python:3.11'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd backend
+        pip install -r requirements.txt
+        python manage.py check
+        # python manage.py test  # Descomentar cuando tengas tests
+    id: 'backend-test'
+
+  # Paso 2: Construir imagen del backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/rios-backend:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/rios-backend:latest'
+      - './backend'
+    id: 'backend-build'
+
+  # Paso 3: Subir imagen del backend a Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/rios-backend:$COMMIT_SHA'
+    id: 'backend-push'
+
+  # Paso 4: Ejecutar migraciones de base de datos
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud run jobs create rios-migrate-$BUILD_ID \
+          --image=gcr.io/$PROJECT_ID/rios-backend:$COMMIT_SHA \
+          --region=us-central1 \
+          --task-timeout=300 \
+          --max-retries=3 \
+          --cpu=1 \
+          --memory=512Mi \
+          --set-env-vars="DEBUG=False" \
+          --set-env-vars="DB_HOST=/cloudsql/$PROJECT_ID:us-central1:rios-db-prod" \
+          --set-env-vars="DB_NAME=rios_desierto_db" \
+          --set-env-vars="DB_USER=rios_user" \
+          --set-env-vars="DB_PASSWORD=$$DB_PASSWORD" \
+          --set-cloudsql-instances=$PROJECT_ID:us-central1:rios-db-prod \
+          --command="python" \
+          --args="manage.py,migrate,--noinput"
+        
+        gcloud run jobs execute rios-migrate-$BUILD_ID --region=us-central1 --wait
+        gcloud run jobs delete rios-migrate-$BUILD_ID --region=us-central1 --quiet
+    secretEnv: ['DB_PASSWORD']
+    id: 'run-migrations'
+
+  # Paso 5: Desplegar backend a Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'rios-backend'
+      - '--image=gcr.io/$PROJECT_ID/rios-backend:$COMMIT_SHA'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=1Gi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--set-env-vars=DEBUG=False'
+      - '--set-env-vars=DB_HOST=/cloudsql/$PROJECT_ID:us-central1:rios-db-prod'
+      - '--set-env-vars=DB_NAME=rios_desierto_db'
+      - '--set-env-vars=DB_USER=rios_user'
+      - '--set-env-vars=DB_PASSWORD=$$DB_PASSWORD'
+      - '--set-cloudsql-instances=$PROJECT_ID:us-central1:rios-db-prod'
+    secretEnv: ['DB_PASSWORD']
+    id: 'deploy-backend'
+
+  # Paso 6: Obtener URL del backend para el frontend
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        BACKEND_URL=$(gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)")
+        echo "BACKEND_URL=$BACKEND_URL" > /workspace/backend_url.env
+    id: 'get-backend-url'
+
+  # Paso 7: Instalar dependencias y construir frontend
+  - name: 'node:18'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd frontend
+        source /workspace/backend_url.env
+        export REACT_APP_API_BASE_URL="$BACKEND_URL/api"
+        export GENERATE_SOURCEMAP=false
+        npm ci
+        npm run build
+    id: 'frontend-build'
+
+  # Paso 8: Construir imagen del frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/backend_url.env
+        docker build \
+          --build-arg REACT_APP_API_BASE_URL="$BACKEND_URL/api" \
+          --build-arg GENERATE_SOURCEMAP=false \
+          -t gcr.io/$PROJECT_ID/rios-frontend:$COMMIT_SHA \
+          -t gcr.io/$PROJECT_ID/rios-frontend:latest \
+          ./frontend
+    id: 'frontend-docker-build'
+
+  # Paso 9: Subir imagen del frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/rios-frontend:$COMMIT_SHA'
+    id: 'frontend-push'
+
+  # Paso 10: Desplegar frontend a Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'rios-frontend'
+      - '--image=gcr.io/$PROJECT_ID/rios-frontend:$COMMIT_SHA'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=5'
+    id: 'deploy-frontend'
+
+  # Paso 11: Verificar despliegue
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Despliegue completado!"
+        echo "Backend URL: $(gcloud run services describe rios-backend --region=us-central1 --format='value(status.url)')"
+        echo "Frontend URL: $(gcloud run services describe rios-frontend --region=us-central1 --format='value(status.url)')"
+        
+        # Test básico de health check
+        BACKEND_URL=$(gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)")
+        curl -f "$BACKEND_URL/api/clientes/" || echo "⚠️ Backend health check falló"
+        
+        FRONTEND_URL=$(gcloud run services describe rios-frontend --region=us-central1 --format="value(status.url)")
+        curl -f "$FRONTEND_URL/health" || echo "⚠️ Frontend health check falló"
+    id: 'verify-deployment'
+
+# Configuración de secretos
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/DB_PASSWORD/versions/latest
+      env: 'DB_PASSWORD'
+
+# Configuración de timeout y recursos
+timeout: '1200s'
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: '100'
+  
+# Imágenes resultantes
+images:
+  - 'gcr.io/$PROJECT_ID/rios-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/rios-frontend:$COMMIT_SHA'
+
+# Variables de sustitución
+substitutions:
+  _REGION: 'us-central1'
+  _DB_INSTANCE: 'rios-db-prod'

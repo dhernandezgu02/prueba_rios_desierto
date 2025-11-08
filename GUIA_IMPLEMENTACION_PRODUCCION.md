@@ -5,14 +5,194 @@
 
 ## 📋 Información del Sistema
 
-**Tecnologías Utilizadas:**
+**Tecnologías:**
 - Backend: Django 5.0.6 + Django REST Framework
 - Frontend: React 18+ con TypeScript
-- Base de Datos: SQLite3 (desarrollo) / PostgreSQL (producción)
-- Servidor Web: Nginx + Gunicorn
-- SO Recomendado: Ubuntu Server 22.04 LTS
+- Base de Datos: PostgreSQL (producción)
+- Containerización: Docker + Docker Compose
+- Nube: **Google Cloud Platform (GCP)**
 
 ---
+
+## 🐳 DESPLIEGUE CON DOCKER
+
+### Requisitos
+- Docker & Docker Compose instalados
+- Git
+- Cuenta de Google Cloud Platform
+
+### Ejecución Local
+```bash
+# Clonar repositorio
+git clone https://github.com/dhernandezgu02/prueba_rios_desierto.git
+cd rios-desierto
+
+# Construir y ejecutar
+docker-compose up --build -d
+
+# Verificar
+docker-compose ps
+docker-compose logs -f
+
+# Acceder:
+# Frontend: http://localhost:3000
+# API: http://localhost:8001/api/
+# Base de datos: localhost:5432
+```
+
+---
+
+## ☁️ DESPLIEGUE EN GOOGLE CLOUD
+
+### 1. Configuración Inicial
+```bash
+# Instalar Google Cloud CLI
+curl https://sdk.cloud.google.com | bash
+
+# Configurar proyecto
+gcloud auth login
+gcloud config set project TU_PROJECT_ID
+```
+
+### 2. Crear Base de Datos
+```bash
+# Crear instancia Cloud SQL
+gcloud sql instances create rios-db-prod \
+    --database-version=POSTGRES_15 \
+    --tier=db-f1-micro \
+    --region=us-central1
+
+# Crear base de datos
+gcloud sql databases create rios_desierto_db \
+    --instance=rios-db-prod
+
+# Crear usuario
+gcloud sql users create rios_user \
+    --instance=rios-db-prod \
+    --password=TU_PASSWORD_SEGURO
+```
+
+### 3. Desplegar Backend
+```bash
+gcloud run deploy rios-backend \
+    --source=./backend \
+    --region=us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars="DEBUG=False" \
+    --set-env-vars="DB_HOST=/cloudsql/TU_PROJECT_ID:us-central1:rios-db-prod" \
+    --set-env-vars="DB_NAME=rios_desierto_db" \
+    --set-env-vars="DB_USER=rios_user" \
+    --set-env-vars="DB_PASSWORD=TU_PASSWORD_SEGURO" \
+    --add-cloudsql-instances=TU_PROJECT_ID:us-central1:rios-db-prod
+```
+
+### 4. Desplegar Frontend
+```bash
+# Obtener URL del backend
+BACKEND_URL=$(gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)")
+
+# Desplegar frontend
+gcloud run deploy rios-frontend \
+    --source=./frontend \
+    --region=us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars="REACT_APP_API_BASE_URL=${BACKEND_URL}/api"
+```
+
+### 5. CI/CD Automático
+```bash
+# Configurar build automático
+gcloud builds submit --config=cloudbuild.yaml
+
+# Crear trigger desde repositorio
+gcloud builds triggers create github \
+    --repo-name=rios-desierto \
+    --repo-owner=TU_GITHUB_USER \
+    --branch-pattern="^main$" \
+    --build-config=cloudbuild.yaml
+```
+
+---
+
+## 🛠️ COMANDOS ÚTILES
+
+### Docker Local
+```bash
+# Ejecutar migraciones
+docker-compose exec backend python manage.py migrate
+
+# Crear superusuario
+docker-compose exec backend python manage.py createsuperuser
+
+# Ver logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Backup de base de datos
+docker-compose exec db pg_dump -U rios_user rios_desierto_db > backup.sql
+```
+
+### Google Cloud
+```bash
+# Ver servicios desplegados
+gcloud run services list --region=us-central1
+
+# Obtener URLs
+gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)"
+gcloud run services describe rios-frontend --region=us-central1 --format="value(status.url)"
+
+# Ver logs en tiempo real
+gcloud run logs tail --service=rios-backend --region=us-central1
+
+# Conectar a base de datos
+gcloud sql connect rios-db-prod --user=rios_user
+```
+
+---
+
+## 📊 ESTRUCTURA DEL PROYECTO
+
+```
+rios-desierto/
+├── backend/
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── Dockerfile
+│   └── nginx.conf
+├── docker-compose.yml
+└── cloudbuild.yaml
+```
+
+---
+
+## � COSTOS ESTIMADOS GCP
+
+- **Cloud Run:** $10-40 USD/mes
+- **Cloud SQL:** $15-50 USD/mes
+- **Cloud Build:** $0-10 USD/mes
+- **Total:** $25-100 USD/mes
+
+---
+
+## 🔗 URLs DE ACCESO
+
+### Local (Docker)
+- Frontend: http://localhost:3000
+- API: http://localhost:8001/api/
+- Admin: http://localhost:8001/admin/
+
+### Google Cloud (dinámicas)
+```bash
+BACKEND=$(gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)")
+FRONTEND=$(gcloud run services describe rios-frontend --region=us-central1 --format="value(status.url)")
+echo "Frontend: $FRONTEND"
+echo "API: $BACKEND/api/"
+```
+
+---
+
+**Sistema listo para producción con Docker y Google Cloud Platform**
 
 ## 🔧 Requisitos del Servidor
 
@@ -39,23 +219,17 @@ sudo apt update && sudo apt upgrade -y
 
 ### 1.2 Instalar Dependencias Base
 ```bash
-# Python y pip
 sudo apt install python3 python3-pip python3-venv -y
 
-# Node.js y npm
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt install nodejs -y
 
-# PostgreSQL
 sudo apt install postgresql postgresql-contrib -y
 
-# Nginx
 sudo apt install nginx -y
 
-# Git
 sudo apt install git -y
 
-# Herramientas adicionales
 sudo apt install htop curl wget unzip -y
 ```
 
@@ -65,12 +239,10 @@ sudo apt install htop curl wget unzip -y
 
 ### 2.1 Configurar PostgreSQL
 ```bash
-# Acceder a PostgreSQL
 sudo -u postgres psql
 
-# Crear base de datos y usuario
 CREATE DATABASE rios_desierto_db;
-CREATE USER rios_user WITH PASSWORD 'tu_password_seguro';
+CREATE USER rios_user WITH PASSWORD '';
 ALTER ROLE rios_user SET client_encoding TO 'utf8';
 ALTER ROLE rios_user SET default_transaction_isolation TO 'read committed';
 ALTER ROLE rios_user SET timezone TO 'UTC';
@@ -78,16 +250,6 @@ GRANT ALL PRIVILEGES ON DATABASE rios_desierto_db TO rios_user;
 \q
 ```
 
-### 2.2 Migrar Datos de SQLite (Opcional)
-```bash
-# Si tienes datos en desarrollo, exportar desde SQLite
-python manage.py dumpdata --natural-foreign --natural-primary > datadump.json
-
-# Luego importar en producción (después de configurar PostgreSQL)
-python manage.py loaddata datadump.json
-```
-
----
 
 ## 🔙 PASO 3: Configuración del Backend
 
@@ -98,13 +260,10 @@ sudo adduser --system --group --home /var/www/rios_desierto rios_app
 
 ### 3.2 Clonar/Subir el Código
 ```bash
-# Opción A: Clonar desde repositorio
-sudo -u rios_app git clone https://github.com/tu_repo/rios_desierto.git /var/www/rios_desierto/
+sudo -u rios_app git clone https://github.com/dhernandezgu02/prueba_rios_desierto.git /var/www/rios_desierto/
 
-# Opción B: Subir archivos manualmente
 sudo mkdir -p /var/www/rios_desierto/
 sudo chown rios_app:rios_app /var/www/rios_desierto/
-# Subir archivos via SCP/FTP
 ```
 
 ### 3.3 Configurar Entorno Virtual Python
@@ -118,7 +277,6 @@ sudo -u rios_app /var/www/rios_desierto/backend/venv/bin/pip install --upgrade p
 cd /var/www/rios_desierto/backend/
 sudo -u rios_app ./venv/bin/pip install -r requirements.txt
 
-# Agregar dependencias adicionales para producción
 sudo -u rios_app ./venv/bin/pip install gunicorn psycopg2-binary whitenoise
 ```
 
@@ -156,9 +314,9 @@ EMAIL_HOST_PASSWORD=tu_password_email
 ### 3.6 Actualizar settings.py para Producción
 Agregar al final de `settings.py`:
 ```python
-# Configuración adicional para producción
+
 if not DEBUG:
-    # Whitenoise para archivos estáticos
+
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
     
@@ -635,3 +793,192 @@ sudo systemctl reload nginx
 **🎉 ¡Implementación Completada!**
 
 Tu sistema "Ríos del Desierto" está ahora ejecutándose en producción con todas las mejores prácticas de seguridad, rendimiento y mantenibilidad.
+
+---
+
+## 🐳 COMANDOS DOCKER ÚTILES
+
+### Gestión de Contenedores
+```bash
+# Construir y ejecutar todos los servicios
+docker-compose up --build -d
+
+# Ver estado de contenedores
+docker-compose ps
+
+# Ver logs en tiempo real
+docker-compose logs -f
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Ejecutar comandos en contenedores
+docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py createsuperuser
+docker-compose exec backend python manage.py collectstatic --noinput
+
+# Parar servicios
+docker-compose down
+
+# Parar y eliminar volúmenes (⚠️ CUIDADO: Elimina datos)
+docker-compose down -v
+```
+
+### Comandos de Desarrollo
+```bash
+# Desarrollo con hot-reload
+docker-compose -f docker-compose.dev.yml up --build
+
+# Ejecutar tests
+docker-compose exec backend python manage.py test
+docker-compose exec frontend npm test
+
+# Acceder a la base de datos
+docker-compose exec db psql -U rios_user -d rios_desierto_db
+
+# Backup de base de datos
+docker-compose exec db pg_dump -U rios_user rios_desierto_db > backup.sql
+
+# Restaurar backup
+cat backup.sql | docker-compose exec -T db psql -U rios_user -d rios_desierto_db
+```
+
+### Optimización de Imágenes
+```bash
+# Limpiar imágenes no utilizadas
+docker system prune -a
+
+# Ver tamaño de imágenes
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+
+# Construir imagen específica
+docker build -t rios-backend:latest ./backend
+docker build -t rios-frontend:latest ./frontend
+
+# Ejecutar contenedor individual
+docker run -p 8000:8000 rios-backend:latest
+docker run -p 3000:80 rios-frontend:latest
+```
+
+---
+
+## ☁️ COMANDOS GOOGLE CLOUD ÚTILES
+
+### Gestión de Cloud Run
+```bash
+# Ver servicios desplegados
+gcloud run services list --region=us-central1
+
+# Ver logs del servicio
+gcloud run logs tail --service=rios-backend --region=us-central1
+gcloud run logs tail --service=rios-frontend --region=us-central1
+
+# Ver URL de servicios
+gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)"
+gcloud run services describe rios-frontend --region=us-central1 --format="value(status.url)"
+
+# Configurar tráfico (Blue-Green deployment)
+gcloud run services update-traffic rios-backend --to-revisions=LATEST=100 --region=us-central1
+
+# Escalar servicio
+gcloud run services update rios-backend --max-instances=20 --region=us-central1
+```
+
+### Gestión de Cloud SQL
+```bash
+# Conectar a la base de datos
+gcloud sql connect rios-db-prod --user=rios_user
+
+# Crear backup
+gcloud sql backups create --instance=rios-db-prod --description="Manual backup $(date)"
+
+# Listar backups
+gcloud sql backups list --instance=rios-db-prod
+
+# Restaurar backup
+gcloud sql backups restore BACKUP_ID --restore-instance=rios-db-prod
+```
+
+### Gestión de Cloud Build
+```bash
+# Ver builds recientes
+gcloud builds list --limit=10
+
+# Ver logs de build específico
+gcloud builds log BUILD_ID
+
+# Ejecutar build manual
+gcloud builds submit --config=cloudbuild.yaml
+
+# Crear trigger desde CLI
+gcloud builds triggers create github \
+    --repo-name=rios-desierto \
+    --repo-owner=TU_USUARIO \
+    --branch-pattern="^main$" \
+    --build-config=cloudbuild.yaml
+```
+
+---
+
+## 📊 MONITOREO EN GOOGLE CLOUD
+
+### Configurar Alertas
+```bash
+# Crear política de alerta para alta latencia
+gcloud alpha monitoring policies create --policy-from-file=monitoring-policy.yaml
+
+# Ver métricas del servicio
+gcloud run services describe rios-backend \
+    --region=us-central1 \
+    --format="export" > service-config.yaml
+```
+
+### Dashboard de Monitoreo
+- **Cloud Console:** https://console.cloud.google.com/run
+- **Logging:** https://console.cloud.google.com/logs
+- **Monitoring:** https://console.cloud.google.com/monitoring
+- **Cloud SQL:** https://console.cloud.google.com/sql
+
+---
+
+## 🚀 URLs DE ACCESO EN PRODUCCIÓN (GOOGLE CLOUD)
+
+```bash
+# Obtener URLs dinámicamente
+BACKEND_URL=$(gcloud run services describe rios-backend --region=us-central1 --format="value(status.url)")
+FRONTEND_URL=$(gcloud run services describe rios-frontend --region=us-central1 --format="value(status.url)")
+
+echo "🌐 URLs de Producción:"
+echo "Frontend: $FRONTEND_URL"
+echo "Backend API: $BACKEND_URL/api/"
+echo "Admin Django: $BACKEND_URL/admin/"
+echo "Búsqueda de clientes: $BACKEND_URL/api/clientes/buscar/"
+echo "Reporte fidelización: $BACKEND_URL/api/clientes/reporte-fidelizacion/"
+```
+
+---
+
+## 📈 CONSIDERACIONES DE COSTOS GCP
+
+### Optimización de Costos
+```bash
+# Configurar mínimo de instancias en 0 (serverless)
+gcloud run services update rios-backend --min-instances=0 --region=us-central1
+gcloud run services update rios-frontend --min-instances=0 --region=us-central1
+
+# Ver uso de recursos
+gcloud run services describe rios-backend --region=us-central1 --format="yaml(spec.template.spec)"
+
+# Configurar límites de CPU y memoria
+gcloud run services update rios-backend \
+    --memory=512Mi \
+    --cpu=1 \
+    --region=us-central1
+```
+
+### Estimación Mensual Actualizada
+- **Cloud Run Backend:** $5-25 USD (con min-instances=0)
+- **Cloud Run Frontend:** $5-15 USD (servido por CDN)
+- **Cloud SQL f1-micro:** $7-15 USD
+- **Cloud Storage:** $1-5 USD
+- **Cloud Build:** $0-5 USD (builds automáticos)
+- **Total Optimizado:** $18-65 USD/mes
