@@ -6,12 +6,12 @@
 README.md
 PROYECTO_INFO.md
 GUIA_IMPLEMENTACION_PRODUCCION.md
+test_docker.py
 
 # Entornos virtuales
 venv/
 env/
 .venv/
-.env
 
 # Python
 __pycache__/

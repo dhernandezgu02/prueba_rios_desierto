@@ -16,8 +16,11 @@ urlpatterns = [
     # Estadísticas de un cliente
     path('<int:cliente_id>/estadisticas/', views.estadisticas_cliente, name='estadisticas_cliente'),
     
-    # Reporte de fidelización en Excel
+    # Reportes y exportaciones con Pandas
     path('reporte/fidelizacion/', views.reporte_fidelizacion_excel, name='reporte_fidelizacion'),
+    path('exportar/csv/', views.exportar_clientes_csv_pandas, name='exportar_csv'),
+    path('exportar/excel/', views.exportar_clientes_excel_pandas, name='exportar_excel'),
+    path('exportar/txt/', views.exportar_clientes_txt_pandas, name='exportar_txt'),
     
     # CRUD básico para clientes
     path('', views.ClienteListView.as_view(), name='cliente_list'),

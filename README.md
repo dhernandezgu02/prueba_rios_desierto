@@ -14,8 +14,9 @@ Sistema completo de gestión de clientes desarrollado con **Django REST Framewor
 
 ✅ **Búsqueda de clientes** por múltiples criterios  
 ✅ **Consulta por número de documento**  
-✅ **Exportación de datos** (CSV, Excel, TXT)  
-✅ **Reporte de fidelización** para clientes con compras >$5MM COP/mes  
+✅ **Exportación automatizada con Pandas** (CSV, Excel, TXT)  
+✅ **Reporte de fidelización con análisis avanzado** para clientes con compras >$5MM COP/mes  
+✅ **Procesamiento de datos optimizado con Pandas** para mejor performance  
 
 ---
 
@@ -38,10 +39,10 @@ docker-compose up --build -d
 # 3. Crear datos de prueba (opcional)
 docker-compose exec backend python manage.py crear_datos_prueba
 
-# 4. Acceder al sistema
+# Acceder al sistema
 # Frontend: http://localhost:3000
-# API: http://localhost:8001/api/
-# Admin Django: http://localhost:8001/admin/
+# API: http://localhost:8000/api/
+# Admin Django: http://localhost:8000/admin/
 ```
 
 **¡Listo!** El sistema estará funcionando en pocos minutos.
@@ -53,7 +54,7 @@ docker-compose exec backend python manage.py crear_datos_prueba
 ### Prerrequisitos
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 15+
+- SQLite3 (incluido con Python)
 
 ### Backend (Django)
 ```bash
@@ -62,13 +63,13 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configurar base de datos
+# Configurar base de datos SQLite3
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py crear_datos_prueba
 
 # Ejecutar servidor
-python manage.py runserver 8001
+python manage.py runserver 8000
 ```
 
 ### Frontend (React)
@@ -86,9 +87,10 @@ npm start  # Desarrollo en puerto 3000
 |------------|---------|-----------|
 | Django | 5.0.6 | Backend API REST |
 | Django REST Framework | 3.15+ | Serialización y API |
+| **Pandas** | **2.0.3** | **Análisis y exportación de datos** |
 | React | 18+ | Frontend SPA |
 | TypeScript | 5+ | Tipado estático |
-| PostgreSQL | 15+ | Base de datos |
+| SQLite3 | Integrado | Base de datos |
 | Docker | Latest | Containerización |
 | Nginx | Latest | Servidor web |
 
@@ -106,16 +108,18 @@ npm start  # Desarrollo en puerto 3000
 - Búsqueda exacta por número de documento
 - Retorna información completa del cliente
 
-### 3️⃣ Sistema de Exportación
-- **CSV:** Formato estándar para Excel
-- **Excel:** Archivo .xlsx con formato
-- **TXT:** Archivo de texto plano
-- Endpoints: `/api/exportar/{formato}/`
+### 3️⃣ Sistema de Exportación Automatizado con Pandas
+- **CSV:** Formato estándar procesado con pandas
+- **Excel:** Múltiples hojas con análisis automático
+- **TXT:** Reporte estructurado con estadísticas
+- Endpoints: `/api/clientes/exportar/{formato}/`
+- **Análisis automático:** Estadísticas, tendencias y métricas
 
-### 4️⃣ Reporte de Fidelización
+### 4️⃣ Reporte de Fidelización con Pandas
+- Procesamiento automatizado de grandes volúmenes de datos
 - Identifica clientes con compras >$5MM COP/mes
-- Análisis estadístico de comportamiento
-- Exportación en múltiples formatos
+- Análisis estadístico avanzado con pandas
+- Exportación multi-formato con métricas detalladas
 
 ---
 
@@ -128,16 +132,16 @@ POST   /api/clientes/buscar/           # Búsqueda con filtros
 GET    /api/consulta-documento/{num}/  # Consulta por documento
 ```
 
-### Exportación
+### Exportación Automatizada con Pandas
 ```
-GET    /api/exportar/csv/              # Exportar CSV
-GET    /api/exportar/excel/            # Exportar Excel  
-GET    /api/exportar/txt/              # Exportar TXT
+GET    /api/clientes/exportar/csv/     # CSV automatizado con pandas
+GET    /api/clientes/exportar/excel/   # Excel multi-hoja con análisis  
+GET    /api/clientes/exportar/txt/     # TXT estructurado con estadísticas
 ```
 
-### Fidelización
+### Fidelización con Análisis Pandas
 ```
-GET    /api/fidelizacion-report/       # Reporte de fidelización
+GET    /api/clientes/fidelizacion-report/  # Reporte avanzado con pandas
 ```
 
 ---
@@ -161,7 +165,7 @@ El comando `python manage.py crear_datos_prueba` crea:
 
 ### Servicios
 - **frontend:** React app (puerto 3000)
-- **backend:** Django API (puerto 8001)  
+- **backend:** Django API (puerto 8000)  
 - **db:** PostgreSQL (puerto 5432)
 
 ### Comandos Útiles

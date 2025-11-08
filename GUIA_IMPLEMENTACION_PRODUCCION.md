@@ -8,7 +8,7 @@
 **Tecnologías:**
 - Backend: Django 5.0.6 + Django REST Framework
 - Frontend: React 18+ con TypeScript
-- Base de Datos: PostgreSQL (producción)
+- Base de Datos: SQLite3 (desarrollo) / PostgreSQL (producción opcional)
 - Containerización: Docker + Docker Compose
 - Nube: **Google Cloud Platform (GCP)**
 
@@ -36,8 +36,8 @@ docker-compose logs -f
 
 # Acceder:
 # Frontend: http://localhost:3000
-# API: http://localhost:8001/api/
-# Base de datos: localhost:5432
+# API: http://localhost:8000/api/
+# Base de datos: SQLite3 (archivo: rios_del_desierto.sqlite3)
 ```
 
 ---
@@ -179,8 +179,8 @@ rios-desierto/
 
 ### Local (Docker)
 - Frontend: http://localhost:3000
-- API: http://localhost:8001/api/
-- Admin: http://localhost:8001/admin/
+- API: http://localhost:8000/api/
+- Admin: http://localhost:8000/admin/
 
 ### Google Cloud (dinámicas)
 ```bash
